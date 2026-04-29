@@ -1,12 +1,3 @@
-; D-PAD USAGE DEMO
-;
-; UPDATED FOR 1 MHz TeenyAT
-;
-; A simple demo to show off the experiment board's d-pad controls.
-; 
-; - John Pertell 11.09.24 - Release
-;                03.07.25 - Updated for 1 MHz TeenyAT
-
 .const PORT_A_DIR 0x8000
 .const PORT_B_DIR 0x8001
 .const PORT_A 0x8002
@@ -34,170 +25,106 @@
 
 .const LEROY_1 0xD1
 .const LEROY_2 0xD3
-.const DELAY_AMT 375 ; assuming machine is at 1 MHz
+.const DELAY_AMT 375
 
 .const WALL 0x84
+.const COIN 0xBA
 
     jmp !init_demo
 
-.var flipped_flag 0   
-
-; Designated Registers:
-; rA => x-coordinate
-; rB => y-coordinate
-; rC => char_sprite
-; rD => delay_amt
-; rE => temp
+.var flipped_flag 0
+.var score 0  
 
 !init_demo
 
     cal !maze_init
+    cal !coin_spawn
 ; Set port A to input mode
     set rE, 0xFFFF 
     str [PORT_A_DIR], rE
 
-; Initialize the delay amount 
-    set rD, DELAY_AMT
+    set rA, 0
+    set rB, 0
+    str [LCD_CURSOR_XY], rZ
 
-; Load initial character sprite
-    set rC, LEROY_1         
+!main
 
-; Zero out the initial coordinates
-    set rA, 0                ; x-coordinate
-    set rB, 0                ; y-coordinate
-
-    str [flipped_flag], rZ   
-    cal !draw_leroy
-
-; Main loop
-!demo_loop
-    cal !check_for_input
     cal !draw_leroy
     cal !delay
-    jmp !demo_loop
+    cal !move_check
+    jmp !main
 
-; Check for d-pad input on port A and go to corresponding label
-!check_for_input
-    set rE, 0xFFFF 
-    str [PORT_A_DIR], rE
-
-    lod rE, [PORT_A]         
-    and rE, 0xF                 ; Bitmask to grab only d-pad buttons
-
-; Down button
-    cmp rE, 0x8        
-    je !down_key_pressed
-        
-; Right button
-    cmp rE, 0x4             
-    je !right_key_pressed
-
-; Up button
-    cmp rE, 0x2             
-    je !up_key_pressed
-
-; Left button
-    cmp rE, 0x1             
-    je !left_key_pressed
-
-!key_pressed
-    ret                      
-
-; Draws Leroy according to the active x and y coords
-; and then also alternates sprites.
 !draw_leroy
-; Set cursor position
-    str [LCD_CURSOR_X], rA      ; x-coordinate
-    str [LCD_CURSOR_Y], rB      ; y-coordinate
+    lod rE, [LCD_CURSOR_XY]
 
-; Toggle sprite between LEROY_1 and LEROY_2
-    cmp rC, LEROY_1      
-    je !use_sprite_two
-!use_sprite_one
-    set rC, LEROY_1 
-    jmp !char_sprite_selected
-!use_sprite_two
-    set rC, LEROY_2  
-!char_sprite_selected
-
-; Shall we flip the sprite?
-    lod rE, [flipped_flag]
-    cmp rE, 0             
-    je !draw_normal
-!draw_flipped
-    set rE, rC
-    bts rE, 14
-    str [LCD_CURSOR], rE
-    jmp !leroy_drawn
-!draw_normal
+    set rC, LEROY_1
     str [LCD_CURSOR], rC
 
-!leroy_drawn
-    cal !delay
+    str [LCD_CURSOR_XY], rE
     ret
 
-; Delete old sprite at old location.
-; Called after key press.
-!delete_old_pos
-    str [LCD_CURSOR_X], rA
-    str [LCD_CURSOR_Y], rB
+!move_check
+
+    set rA, 1
+    set rB, 4
+
+    lod rC, [PORT_A]
+    and rC, 0xF
+    cmp rC, rZ
+    je !check_loop_done
+
+!check_loop
+
+    set rD, rC
+    and rD, rA
+
+    cmp rD, rA
+    je !move_detected 
+
+    shr rC, 1
+    lup rB, !check_loop
+
+!check_loop_done
+    ret
+
+!move_detected
+
+    lod rE, [LCD_CURSOR_XY]
+
+    lod rD, [rB + !MOVES]
+    lod rC, [rD]
+    ;lod rC, [LCD_MOVE_RIGHT_WRAP] ;Don't know if this is my code or a bug, but this does not "peek" as its supposed to so i have to reset the cursor after
+    cmp rC, WALL
+
+    str [LCD_CURSOR_XY], rE
+    je !check_loop_done
+
+    lod rE, [LCD_CURSOR_XY]
     str [LCD_CURSOR], rZ
-    ret
+    str [LCD_CURSOR_XY], rE
+    
+    set rA, 1
+    lod rD, [rB + !MOVES]
+    str [rD], rA
 
-; Move Leroy down
-!down_key_pressed
+    cmp rC, COIN
+    jne !check_loop_done
 
-    cal !can_move_down
-    cmp rE, 1
-    je !key_pressed
-
-    cal !delete_old_pos
-    inc rB     
-    jmp !key_pressed
-
-; Move Leroy to the right and set sprite orientation to the right
-!right_key_pressed
-
-    cal !can_move_right
-    cmp rE, 1
-    je !right_flip
-
-    cal !delete_old_pos
+!coin_collected
+    lod rA, [score]
     inc rA
 
-!right_flip     
-    str [flipped_flag], rZ  
-    jmp !key_pressed
+    str [PORT_B], rA
+    str [score], rA
 
-; Move Leroy up
-!up_key_pressed
+    cal !coin_spawn
+    jmp !check_loop_done
 
-    cal !can_move_up
-    cmp rE, 1
-    je !key_pressed
+;-------------Delay ---------------------
 
-    cal !delete_old_pos
-    dec rB     
-    jmp !key_pressed
-
-; Move Leroy left and set sprite orientation to the left
-!left_key_pressed
-
-    cal !can_move_left
-    cmp rE, 1
-    je !left_flip
-
-    cal !delete_old_pos
-    dec rA
-
-!left_flip     
-    set rE, 1
-    str [flipped_flag], rE  
-    jmp !key_pressed
-
-; Delay used to slow down the frames
 !delay
-    set rE, 0                       
+    set rE, 0
+    set rD, DELAY_AMT                       
 !inner_delay_loop
     inc rE
     dly rE
@@ -205,92 +132,33 @@
     jl !inner_delay_loop
     ret
 
-;------------- WALL CHECK ---------------------
+;-------------COIN SPAWNING---------------------
+!coin_spawn
+    ;psh rE
+    lod rE, [LCD_CURSOR_XY]
 
-!can_move_down
-    
-    psh rD
-    set rE, 0
+!spawn_loop
 
-    inc rB
-    str [LCD_CURSOR_Y], rB
-    lod rE, [LCD_CURSOR]
+    lod rA, [RAND]
+    lod rB, [RAND]
 
-    set rD, WALL
-    cmp rE, rD
-    jne !end_check_down
+    mod rA, 20
+    mod rB, 4
 
-    set rE, 1
+    str [LCD_CURSOR_X], rA      ; x-coordinate
+    str [LCD_CURSOR_Y], rB      ; y-coordinate
 
-!end_check_down
-    dec rB
-    str [LCD_CURSOR_Y], rB
-    pop rD
+    lod rA, [LCD_CURSOR]     
+    cmp rA, WALL
+    je !spawn_loop
+
+    set rA, COIN
+    str [LCD_CURSOR], rA
+
+    str [LCD_CURSOR_XY], rE
+
+    ;pop rE
     ret
-
-!can_move_right
-
-    psh rD
-    set rE, 0
-
-    inc rA
-    str [LCD_CURSOR_X], rA
-    lod rE, [LCD_CURSOR]
-
-    set rD, WALL
-    cmp rE, rD
-    jne !end_check_right
-
-    set rE, 1
-
-!end_check_right
-    dec rA
-    str [LCD_CURSOR_X], rA
-    pop rD
-    ret
-
-!can_move_up
-
-    psh rD
-    set rE, 0
-
-    dec rB
-    str [LCD_CURSOR_Y], rB
-    lod rE, [LCD_CURSOR]
-
-    set rD, WALL
-    cmp rE, rD
-    jne !end_check_up
-
-    set rE, 1
-
-!end_check_up
-    inc rB
-    str [LCD_CURSOR_Y], rB
-    pop rD
-    ret
-
-!can_move_left
-
-    psh rD
-    set rE, 0
-
-    dec rA
-    str [LCD_CURSOR_X], rA
-    lod rE, [LCD_CURSOR]
-
-    set rD, WALL
-    cmp rE, rD
-    jne !end_check_left
-
-    set rE, 1
-
-!end_check_left
-    inc rA
-    str [LCD_CURSOR_X], rA
-    pop rD
-    ret
-
 
 ;------------- MAZE DRAWING ---------------------
 
@@ -325,8 +193,11 @@
 !draw_walls_end
     ret
 
-
 ;------------- DATA SECTION ---------------------
 
 !WAll_ROWS
 .raw 4 5 14 15 100 1 8 9 10 11 18 100 1 8 9 10 11 18 100 4 5 14 15 100
+
+!MOVES
+.raw 0xBEEF LCD_MOVE_DOWN_WRAP LCD_MOVE_RIGHT_WRAP LCD_MOVE_UP_WRAP LCD_MOVE_LEFT_WRAP
+
