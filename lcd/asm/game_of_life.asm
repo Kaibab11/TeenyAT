@@ -32,7 +32,11 @@
 .const WHITE 2561
 
 .const DEAD_COLOR 2561
-.const ALIVE_COLOR 0
+
+jmp !draw_white_to_screen
+
+.var ALIVE_COLOR 0
+.var PREVIOUS_ALIVE_COLOR 0
 
 !draw_white_to_screen
     str [X1], rZ            ; store zero into X1 address
@@ -67,7 +71,7 @@
 
 
 !set_starting
-    set rC, ALIVE_COLOR
+    lod rC, [ALIVE_COLOR]
     str [X1], rA
     str [Y1], rB
     str [STROKE], rC
@@ -88,6 +92,11 @@
     cmp rD, 'R'
     je !draw_white_to_screen
 
+    lod rA, [ALIVE_COLOR]
+    str [PREVIOUS_ALIVE_COLOR], rA
+    add rA, 100
+    str [ALIVE_COLOR], rA
+
     jmp !main
 
 !update_cells
@@ -98,7 +107,8 @@
     set rD, rE + LIVESCREEN ; Get pixel index
 
     lod rA, [rD]            ; Load color of current pixel
-    cmp rA, ALIVE_COLOR
+    lod rB, [PREVIOUS_ALIVE_COLOR]
+    cmp rA, rB
 
     je !its_alive           ; jump if its the alive color
 
@@ -141,7 +151,7 @@
 
     set rC, rE + UPDATESCREEN   ; get relative pixel coords for UPDATESCREEN
 
-    set rA, ALIVE_COLOR
+    lod rA, [ALIVE_COLOR]
     str [STROKE], rA
     str [rC], rA
 
@@ -164,7 +174,7 @@
 
     set rC, rE + UPDATESCREEN ; get relative pixel coords for UPDATESCREEN
 
-    set rA, ALIVE_COLOR
+    lod rA, [ALIVE_COLOR]
     str [STROKE], rA
     str [rC], rA
 
@@ -173,10 +183,12 @@
 
 ;-----------------------------------------------
 !check_neighbors ; Expects rD to have current pixel index, Stores count into rA
-
     ;index - 65  index - 64  index - 63
     ;index -  1  [cell]      index +  1
     ;index + 63  index + 64  index + 65
+
+    psh rE
+    lod rE, [PREVIOUS_ALIVE_COLOR]
 
     set rA, rZ          ; Reset rA to 0
 
@@ -188,7 +200,7 @@
     jl !check_2
 
     lod rB, [rC]
-    cmp rB, ALIVE_COLOR
+    cmp rB, rE
 
     jne !check_2
 
@@ -202,7 +214,7 @@
     jl !check_3
 
     lod rB, [rC]
-    cmp rB, ALIVE_COLOR
+    cmp rB, rE
 
     jne !check_3    
 
@@ -215,7 +227,7 @@
     jl !check_4
 
     lod rB, [rC]
-    cmp rB, ALIVE_COLOR
+    cmp rB, rE
 
     jne !check_4
 
@@ -226,7 +238,7 @@
     set rC, rD - 1 ; [-1, 0]
 
     lod rB, [rC]
-    cmp rB, ALIVE_COLOR
+    cmp rB, rE
 
     jne !check_5
 
@@ -238,7 +250,7 @@
     set rC, rD + 1 ; [+1, 0]
 
     lod rB, [rC]
-    cmp rB, ALIVE_COLOR
+    cmp rB, rE
 
     jne !check_6
 
@@ -252,7 +264,7 @@
     jge !check_7
 
     lod rB, [rC]
-    cmp rB, ALIVE_COLOR
+    cmp rB, rE
 
     jne !check_7
 
@@ -266,7 +278,7 @@
     jge !check_8
 
     lod rB, [rC]
-    cmp rB, ALIVE_COLOR
+    cmp rB, rE
 
     jne !check_8
 
@@ -280,13 +292,14 @@
     jge !end_check
 
     lod rB, [rC]
-    cmp rB, ALIVE_COLOR
+    cmp rB, rE
 
     jne !end_check
 
     cal !increment_count
 
 !end_check
+    pop rE
     ret
 
 !increment_count
