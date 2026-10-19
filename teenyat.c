@@ -95,9 +95,7 @@ static void default_bus_write(teenyat *t, tny_uword addr, tny_word data, uint16_
 	return;
 }
 
-bool tny_init_from_file(teenyat *t, FILE *bin_file,
-                        TNY_READ_FROM_BUS_FNPTR bus_read,
-                        TNY_WRITE_TO_BUS_FNPTR bus_write) {
+bool tny_init_from_file(teenyat *t, FILE *bin_file) {
 
 	if(!t) {
 		return false;
@@ -114,9 +112,9 @@ bool tny_init_from_file(teenyat *t, FILE *bin_file,
 		return false;
 	}
 
-	/* store bus callbacks */
-	t->bus_read = bus_read ? bus_read : default_bus_read;
-	t->bus_write = bus_write ? bus_write : default_bus_write;
+	/* default bus callbacks; replace with tny_bus_read()/tny_bus_write() */
+	t->bus_read = default_bus_read;
+	t->bus_write = default_bus_write;
 
 	/*
 	 * Initialize the clock_rate structure.  Note the epoch and
@@ -139,13 +137,11 @@ bool tny_init_from_file(teenyat *t, FILE *bin_file,
 	return true;
 }
 
-bool tny_init_unclocked(teenyat *t, FILE *bin_file,
-                        TNY_READ_FROM_BUS_FNPTR bus_read,
-                        TNY_WRITE_TO_BUS_FNPTR bus_write) {
+bool tny_init_unclocked(teenyat *t, FILE *bin_file) {
 
 	if(!t) return false;
 
-	bool result = tny_init_from_file(t,bin_file,bus_read,bus_write);
+	bool result = tny_init_from_file(t,bin_file);
 	t->control_status_register.csr.unclocked = 1;
 	
 	return result;
@@ -281,6 +277,18 @@ void tny_modify_port_levels(teenyat *t, bool is_system_request, tny_word data, b
 
 void tny_port_change(teenyat *t, TNY_PORT_CHANGE_FNPTR port_change) {
 	t->port_change = port_change;
+
+	return;
+}
+
+void tny_bus_read(teenyat *t, TNY_READ_FROM_BUS_FNPTR bus_read) {
+	t->bus_read = bus_read ? bus_read : default_bus_read;
+
+	return;
+}
+
+void tny_bus_write(teenyat *t, TNY_WRITE_TO_BUS_FNPTR bus_write) {
+	t->bus_write = bus_write ? bus_write : default_bus_write;
 
 	return;
 }

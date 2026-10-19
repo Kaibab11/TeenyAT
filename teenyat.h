@@ -401,12 +401,6 @@ struct teenyat {
  * @param bin_file
  *   The pre-assembled .bin file to load and execute
  *
- * @param bus_read
- *   Callback function for handling read requests
- *
- * @param bus_write
- *   Callback function for handling write requests
- *
  * @return
  *   True on success, flase otherwise.
  *
@@ -414,9 +408,7 @@ struct teenyat {
  *   Upon failed initialization, the t->initialized member can be assumed false,
  *   but the state of all other members is undefined.
  */
-bool tny_init_from_file(teenyat *t, FILE *bin_file,
-                        TNY_READ_FROM_BUS_FNPTR bus_read,
-                        TNY_WRITE_TO_BUS_FNPTR bus_write);
+bool tny_init_from_file(teenyat *t, FILE *bin_file);
 
 /**
  * @brief
@@ -428,12 +420,6 @@ bool tny_init_from_file(teenyat *t, FILE *bin_file,
  * @param bin_file
  *   The pre-assembled .bin file to load and execute
  *
- * @param bus_read
- *   Callback function for handling read requests
- *
- * @param bus_write
- *   Callback function for handling write requests
- *
  * @return
  *   True on success, flase otherwise.
  *
@@ -441,9 +427,7 @@ bool tny_init_from_file(teenyat *t, FILE *bin_file,
  *   Upon failed initialization, the t->initialized member can be assumed false,
  *   but the state of all other members is undefined.
  */
-bool tny_init_unclocked(teenyat *t, FILE *bin_file,
-						TNY_READ_FROM_BUS_FNPTR bus_read,
-						TNY_WRITE_TO_BUS_FNPTR bus_write);
+bool tny_init_unclocked(teenyat *t, FILE *bin_file);
 
 /**
  * @brief
@@ -535,6 +519,30 @@ void tny_set_ports(teenyat *t, tny_word *a, tny_word *b);
  *   Callback for handling external port level changes
  */
 void tny_port_change(teenyat *t, TNY_PORT_CHANGE_FNPTR port_change);
+
+/**
+ * @brief  
+ *   Register the bus read callback (NULL restores the no-op default)
+ * 
+ * @param bus_read
+ *   Callback function for handling read requests
+ * 
+ * @note
+ *   Call after tny_init (initialization clears the instance).
+ */
+void tny_bus_read(teenyat *t, TNY_READ_FROM_BUS_FNPTR bus_read);
+
+/**
+ * @brief
+ *   Register the bus write callback (NULL restores the no-op default)
+ * 
+ * @param bus_write
+ *   Callback function for handling write requests
+ * 
+ * @note
+ *   Call after tny_init (initialization clears the instance).
+ */
+void tny_bus_write(teenyat *t, TNY_WRITE_TO_BUS_FNPTR bus_write);
 
 /**
  * @brief
